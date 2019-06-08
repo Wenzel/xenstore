@@ -1,0 +1,10 @@
+language: rust
+rust:
+  - stable
+
+sudo: required
+install:
+  - sudo apt-get install libxen-dev
+script:
+  - cargo build
+  - cargo test
