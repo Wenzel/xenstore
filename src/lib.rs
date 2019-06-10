@@ -67,3 +67,9 @@ impl Xs {
     }
 }
 
+impl Drop for Xs {
+    fn drop(&mut self) {
+        self.close();
+    }
+}
+
