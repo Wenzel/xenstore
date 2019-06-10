@@ -50,6 +50,16 @@ impl Xs {
         dir
     }
 
+    pub fn read(&self, transaction: XBTransaction, path: String) -> String {
+        let mut len = 0;
+        let len_ptr: *mut c_uint = &mut len;
+        let c_path = CString::new(path).unwrap();
+        unsafe {
+            let res = xenstore_sys::xs_read(self.handle, transaction as u32, c_path.as_ptr(), len_ptr);
+            CStr::from_ptr(res as *mut c_char).to_string_lossy().into_owned()
+        }
+    }
+
     pub fn close(&mut self) {
         unsafe {
             xenstore_sys::xs_close(self.handle);
