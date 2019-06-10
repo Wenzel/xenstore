@@ -16,6 +16,7 @@ pub enum XsOpenFlags {
     SocketOnly = 2,
 }
 
+#[derive(Debug)]
 pub struct Xs {
     handle: *mut xenstore_sys::xs_handle,
 }
