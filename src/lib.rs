@@ -5,15 +5,15 @@ use std::os::raw::{c_uint, c_char};
 use std::ffi::{CString, CStr};
 use std::slice;
 
+#[repr(u32)]
 pub enum XBTransaction {
-    //Null = xenstore_sys::XBT_NULL,
-    Null = 0,
+    Null = xenstore_sys::XBT_NULL,
 }
 
+#[repr(u32)]
 pub enum XsOpenFlags {
-    // ReadOnly = xenstore_sys::XS_OPEN_READONLY,
-    ReadOnly = 1,
-    SocketOnly = 2,
+    ReadOnly = xenstore_sys::XS_OPEN_READONLY,
+    SocketOnly = xenstore_sys::XS_OPEN_SOCKETONLY,
 }
 
 #[derive(Debug)]
