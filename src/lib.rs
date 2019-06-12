@@ -61,7 +61,7 @@ impl Xs {
         }
     }
 
-    pub fn close(&mut self) {
+    fn close(&mut self) {
         unsafe {
             xenstore_sys::xs_close(self.handle);
         };
