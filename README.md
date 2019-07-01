@@ -1,5 +1,6 @@
 # xenstore
 
+[![Build Status](https://travis-ci.org/Wenzel/xenstore.svg?branch=master)](https://travis-ci.org/Wenzel/xenstore)
 [![standard-readme compliant](https://img.shields.io/badge/readme%20style-standard-brightgreen.svg?style=flat-square)](https://github.com/RichardLitt/standard-readme)
 
 > Rust bindings for xenstore library
