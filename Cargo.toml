@@ -3,6 +3,11 @@ name = "xenstore"
 version = "0.1.0"
 authors = ["Mathieu Tarral <mathieu.tarral@protonmail.com>"]
 edition = "2018"
+repository = "https://github.com/Wenzel/xenstore-sys"
+readme = "README.md"
+keywords = ["xen"]
+description = "Rust bindings for Xenstore"
+license = "GPL-3.0-only"
 
 [dependencies]
 xenstore-sys = "0.1.1"
