@@ -10,4 +10,6 @@ description = "Rust bindings for Xenstore"
 license = "GPL-3.0-only"
 
 [dependencies]
+libloading = "0.6.1"
+log = "0.4.8"
 xenstore-sys = { git = "https://github.com/Wenzel/xenstore-sys" }
