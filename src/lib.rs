@@ -2,7 +2,7 @@ mod libxenstore;
 
 use std::ffi::{CStr, CString};
 use std::io::Error;
-use std::os::raw::{c_char, c_uint};
+use std::os::raw::c_char;
 use std::ptr::null_mut;
 use std::slice;
 
@@ -45,12 +45,10 @@ impl Xs {
 
     pub fn directory(&self, transaction: XBTransaction, path: String) -> Vec<String> {
         let mut num = 0;
-        let num_ptr: *mut c_uint = &mut num;
         let c_path = CString::new(path).unwrap();
         let mut dir: Vec<String> = Vec::new();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
-        let res =
-            (self.libxenstore.directory)(self.handle, trans_value, c_path.as_ptr(), num_ptr);
+        let res = (self.libxenstore.directory)(self.handle, trans_value, c_path.as_ptr(), &mut num);
         unsafe {
             let array: &[*mut c_char] = slice::from_raw_parts_mut(res, num as usize);
             for x in array {
@@ -63,11 +61,9 @@ impl Xs {
 
     pub fn read(&self, transaction: XBTransaction, path: String) -> String {
         let mut len = 0;
-        let len_ptr: *mut c_uint = &mut len;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
-        let res =
-            (self.libxenstore.read)(self.handle, trans_value, c_path.as_ptr(), len_ptr);
+        let res = (self.libxenstore.read)(self.handle, trans_value, c_path.as_ptr(), &mut len);
         unsafe {
             CStr::from_ptr(res as *mut c_char)
                 .to_string_lossy()
