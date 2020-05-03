@@ -6,9 +6,14 @@ use std::os::raw::{c_char, c_uint};
 use std::ptr::null_mut;
 use std::slice;
 
+#[macro_use]
+extern crate enum_primitive_derive;
+use num_traits::ToPrimitive;
+
 use libxenstore::LibXenStore;
 
 #[repr(u32)]
+#[derive(Primitive)]
 pub enum XBTransaction {
     Null = xenstore_sys::XBT_NULL,
 }
@@ -43,8 +48,9 @@ impl Xs {
         let num_ptr: *mut c_uint = &mut num;
         let c_path = CString::new(path).unwrap();
         let mut dir: Vec<String> = Vec::new();
+        let trans_value = transaction.to_u32().expect("Invalid transaction value");
         let res =
-            (self.libxenstore.directory)(self.handle, transaction as u32, c_path.as_ptr(), num_ptr);
+            (self.libxenstore.directory)(self.handle, trans_value, c_path.as_ptr(), num_ptr);
         unsafe {
             let array: &[*mut c_char] = slice::from_raw_parts_mut(res, num as usize);
             for x in array {
@@ -59,8 +65,9 @@ impl Xs {
         let mut len = 0;
         let len_ptr: *mut c_uint = &mut len;
         let c_path = CString::new(path).unwrap();
+        let trans_value = transaction.to_u32().expect("Invalid transaction value");
         let res =
-            (self.libxenstore.read)(self.handle, transaction as u32, c_path.as_ptr(), len_ptr);
+            (self.libxenstore.read)(self.handle, trans_value, c_path.as_ptr(), len_ptr);
         unsafe {
             CStr::from_ptr(res as *mut c_char)
                 .to_string_lossy()
