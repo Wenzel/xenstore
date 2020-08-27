@@ -30,20 +30,37 @@ pub struct Xs {
     libxenstore: LibXenStore,
 }
 
+pub trait XsIntrospectable: std::fmt::Debug {
+    fn init(&mut self, open_type: XsOpenFlags) -> Result<(), Error>;
+    fn directory(&self, transaction: XBTransaction, path: String) -> Vec<String>;
+    fn read(&self, transaction: XBTransaction, path: String) -> String;
+    fn close(&mut self);
+}
+
+pub fn create_xen_store() -> Xs {
+    Xs::new(unsafe { LibXenStore::new() })
+}
+
 impl Xs {
-    pub fn new(open_type: XsOpenFlags) -> Result<Self, Error> {
-        let libxenstore = unsafe { LibXenStore::new() };
-        let xs_handle = (libxenstore.open)(open_type as u64);
+    fn new(libxenstore: LibXenStore) -> Xs {
+        Xs {
+            handle: null_mut(),
+            libxenstore,
+        }
+    }
+}
+
+impl XsIntrospectable for Xs {
+    fn init(&mut self, open_type: XsOpenFlags) -> Result<(), Error> {
+        let xs_handle = (self.libxenstore.open)(open_type as u64);
         if xs_handle == null_mut() {
             return Err(Error::last_os_error());
         }
-        return Ok(Xs {
-            handle: xs_handle,
-            libxenstore,
-        });
+        self.handle = xs_handle;
+        Ok(())
     }
 
-    pub fn directory(&self, transaction: XBTransaction, path: String) -> Vec<String> {
+    fn directory(&self, transaction: XBTransaction, path: String) -> Vec<String> {
         let mut num = 0;
         let c_path = CString::new(path).unwrap();
         let mut dir: Vec<String> = Vec::new();
@@ -59,7 +76,7 @@ impl Xs {
         dir
     }
 
-    pub fn read(&self, transaction: XBTransaction, path: String) -> String {
+    fn read(&self, transaction: XBTransaction, path: String) -> String {
         let mut len = 0;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
