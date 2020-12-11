@@ -3,7 +3,6 @@ mod libxenstore;
 use std::ffi::{CStr, CString};
 use std::io::Error;
 use std::os::raw::c_char;
-use std::ptr::null_mut;
 use std::slice;
 
 #[macro_use]
@@ -34,13 +33,14 @@ impl Xs {
     pub fn new(open_type: XsOpenFlags) -> Result<Self, Error> {
         let libxenstore = unsafe { LibXenStore::new() };
         let xs_handle = (libxenstore.open)(open_type as u64);
-        if xs_handle == null_mut() {
-            return Err(Error::last_os_error());
+        if xs_handle.is_null() {
+            Err(Error::last_os_error())
+        } else {
+            Ok(Xs {
+                handle: xs_handle,
+                libxenstore,
+            })
         }
-        return Ok(Xs {
-            handle: xs_handle,
-            libxenstore,
-        });
     }
 
     pub fn directory(&self, transaction: XBTransaction, path: String) -> Vec<String> {
@@ -59,15 +59,21 @@ impl Xs {
         dir
     }
 
-    pub fn read(&self, transaction: XBTransaction, path: String) -> String {
+    pub fn read(&self, transaction: XBTransaction, path: String) -> Result<String, Error> {
         let mut len = 0;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
         let res = (self.libxenstore.read)(self.handle, trans_value, c_path.as_ptr(), &mut len);
-        unsafe {
-            CStr::from_ptr(res as *mut c_char)
-                .to_string_lossy()
-                .into_owned()
+        if res.is_null() {
+            Err(Error::last_os_error())
+        } else {
+            unsafe {
+                let res_string = CStr::from_ptr(res as *mut c_char)
+                    .to_string_lossy()
+                    .into_owned();
+                libc::free(res);
+                Ok(res_string)
+            }
         }
     }
 
