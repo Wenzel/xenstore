@@ -6,7 +6,7 @@ use libloading::os::unix::Symbol as RawSymbol;
 use libloading::{Library, Symbol};
 use log::info;
 
-const LIBXENSTORE_FILENAME: &'static str = "libxenstore.so";
+const LIBXENSTORE_FILENAME: &str = "libxenstore.so";
 // xs_open
 type FnOpen = fn(flags: c_ulong) -> *mut xs_handle;
 // xs_close
