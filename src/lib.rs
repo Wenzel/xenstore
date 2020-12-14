@@ -43,11 +43,7 @@ impl Xs {
         }
     }
 
-    pub fn directory(
-        &self,
-        transaction: XBTransaction,
-        path: String,
-    ) -> Result<Vec<String>, Error> {
+    pub fn directory(&self, transaction: XBTransaction, path: &str) -> Result<Vec<String>, Error> {
         let mut num = 0;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
@@ -67,7 +63,7 @@ impl Xs {
         }
     }
 
-    pub fn read(&self, transaction: XBTransaction, path: String) -> Result<String, Error> {
+    pub fn read(&self, transaction: XBTransaction, path: &str) -> Result<String, Error> {
         let mut len = 0;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
