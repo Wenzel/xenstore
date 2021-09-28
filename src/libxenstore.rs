@@ -3,7 +3,7 @@ use std::os::raw::{c_char, c_uint, c_ulong, c_void};
 use xenstore_sys::{xs_handle, xs_transaction_t};
 
 use libloading::os::unix::Symbol as RawSymbol;
-use libloading::{Library, Symbol};
+use libloading::{Error, Library, Symbol};
 use log::info;
 
 const LIBXENSTORE_FILENAME: &str = "libxenstore.so";
@@ -36,28 +36,28 @@ pub struct LibXenStore {
 }
 
 impl LibXenStore {
-    pub unsafe fn new() -> Self {
+    pub unsafe fn new() -> Result<Self, Error> {
         info!("Loading {}", LIBXENSTORE_FILENAME);
-        let lib = Library::new(LIBXENSTORE_FILENAME).unwrap();
+        let lib = Library::new(LIBXENSTORE_FILENAME)?;
         // load symbols
-        let open_sym: Symbol<FnOpen> = lib.get(b"xs_open\0").unwrap();
+        let open_sym: Symbol<FnOpen> = lib.get(b"xs_open\0")?;
         let open = open_sym.into_raw();
 
-        let close_sym: Symbol<FnClose> = lib.get(b"xs_close\0").unwrap();
+        let close_sym: Symbol<FnClose> = lib.get(b"xs_close\0")?;
         let close = close_sym.into_raw();
 
-        let directory_sym: Symbol<FnDirectory> = lib.get(b"xs_directory\0").unwrap();
+        let directory_sym: Symbol<FnDirectory> = lib.get(b"xs_directory\0")?;
         let directory = directory_sym.into_raw();
 
-        let read_sym: Symbol<FnRead> = lib.get(b"xs_read\0").unwrap();
+        let read_sym: Symbol<FnRead> = lib.get(b"xs_read\0")?;
         let read = read_sym.into_raw();
 
-        LibXenStore {
+        Ok(LibXenStore {
             lib,
             open,
             close,
             directory,
             read,
-        }
+        })
     }
 }

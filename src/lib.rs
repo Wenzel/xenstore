@@ -1,7 +1,8 @@
 mod libxenstore;
 
+use std::error::Error;
 use std::ffi::{c_void, CStr, CString};
-use std::io::Error;
+use std::io::Error as IoError;
 use std::os::raw::c_char;
 use std::slice;
 
@@ -30,11 +31,11 @@ pub struct Xs {
 }
 
 impl Xs {
-    pub fn new(open_type: XsOpenFlags) -> Result<Self, Error> {
-        let libxenstore = unsafe { LibXenStore::new() };
+    pub fn new(open_type: XsOpenFlags) -> Result<Self, Box<dyn Error>> {
+        let libxenstore = unsafe { LibXenStore::new()? };
         let xs_handle = (libxenstore.open)(open_type as u64);
         if xs_handle.is_null() {
-            Err(Error::last_os_error())
+            Err(Box::new(IoError::last_os_error()))
         } else {
             Ok(Xs {
                 handle: xs_handle,
@@ -43,13 +44,17 @@ impl Xs {
         }
     }
 
-    pub fn directory(&self, transaction: XBTransaction, path: &str) -> Result<Vec<String>, Error> {
+    pub fn directory(
+        &self,
+        transaction: XBTransaction,
+        path: &str,
+    ) -> Result<Vec<String>, IoError> {
         let mut num = 0;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
         let res = (self.libxenstore.directory)(self.handle, trans_value, c_path.as_ptr(), &mut num);
         if res.is_null() {
-            Err(Error::last_os_error())
+            Err(IoError::last_os_error())
         } else {
             let mut dir: Vec<String> = Vec::new();
             unsafe {
@@ -63,13 +68,13 @@ impl Xs {
         }
     }
 
-    pub fn read(&self, transaction: XBTransaction, path: &str) -> Result<String, Error> {
+    pub fn read(&self, transaction: XBTransaction, path: &str) -> Result<String, IoError> {
         let mut len = 0;
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
         let res = (self.libxenstore.read)(self.handle, trans_value, c_path.as_ptr(), &mut len);
         if res.is_null() {
-            Err(Error::last_os_error())
+            Err(IoError::last_os_error())
         } else {
             unsafe {
                 let res_string = CStr::from_ptr(res as *mut c_char)
