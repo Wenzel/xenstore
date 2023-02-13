@@ -25,6 +25,14 @@ type FnRead = fn(
     path: *const c_char,
     len: *mut c_uint,
 ) -> *mut c_void;
+// xs_write
+type FnWrite = fn(
+    h: *mut xs_handle,
+    t: xs_transaction_t,
+    path: *const c_char,
+    data: *const c_void,
+    len: c_uint,
+) -> bool;
 
 #[derive(Debug)]
 pub struct LibXenStore {
@@ -33,6 +41,7 @@ pub struct LibXenStore {
     pub close: RawSymbol<FnClose>,
     pub directory: RawSymbol<FnDirectory>,
     pub read: RawSymbol<FnRead>,
+    pub write: RawSymbol<FnWrite>,
 }
 
 impl LibXenStore {
@@ -53,12 +62,16 @@ impl LibXenStore {
         let read_sym: Symbol<FnRead> = lib.get(b"xs_read\0")?;
         let read = read_sym.into_raw();
 
+        let write_sym: Symbol<FnWrite> = lib.get(b"xs_write\0")?;
+        let write = write_sym.into_raw();
+
         Ok(LibXenStore {
             _lib: lib,
             open,
             close,
             directory,
             read,
+            write,
         })
     }
 }
