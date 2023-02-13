@@ -18,3 +18,4 @@ enum-primitive-derive = "0.1.2"
 num-traits = "0.2.11"
 xenstore-sys = "0.1.1"
 libc = "0.2"
+clap = { version = "4.1.4", features = ["derive"] }
