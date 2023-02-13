@@ -20,6 +20,13 @@ enum Command {
         #[arg()]
         path: String,
     },
+    /// Write value to Xenstore path
+    Write {
+        #[arg()]
+        path: String,
+        #[arg()]
+        data: String,
+    },
 }
 
 fn main() {
@@ -31,6 +38,7 @@ fn main() {
     match cli.command {
         Command::List{path} => cmd_list(&xs, &path),
         Command::Read{path} => cmd_read(&xs, &path),
+        Command::Write{path, data} => cmd_write(&xs, &path, &data),
     }
 }
 
@@ -46,4 +54,9 @@ fn cmd_read(xs: &Xs, path: &String) {
     let value = xs.read(XBTransaction::Null, &path)
         .expect("path should be readable");
     println!("{}", value);
+}
+
+fn cmd_write(xs: &Xs, path: &String, data: &String) {
+    xs.write(XBTransaction::Null, &path, &data)
+        .expect("cannot write to xenstore path");
 }
