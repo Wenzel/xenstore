@@ -103,6 +103,17 @@ impl Xs {
         }
     }
 
+    pub fn rm(&self, transaction: XBTransaction, path: &str) -> Result<(), IoError> {
+        let c_path = CString::new(path).unwrap();
+        let trans_value = transaction.to_u32().expect("Invalid transaction value");
+        let res = (self.libxenstore.rm)(self.handle, trans_value, c_path.as_ptr());
+        if res {
+            Ok(())
+        } else {
+            Err(IoError::last_os_error())
+        }
+    }
+
     fn close(&mut self) {
         (self.libxenstore.close)(self.handle);
     }
