@@ -39,6 +39,7 @@ pub struct Xs {
 }
 
 unsafe impl Send for Xs {}
+unsafe impl Sync for Xs {}
 
 #[derive(Debug)]
 pub struct XsWatchEntry {
@@ -55,6 +56,9 @@ pub struct XsStream<'a> {
     fd: Option<AsyncFd<i32>>,
     current_fd: Option<i32>,
 }
+
+unsafe impl Send for XsStream<'_> {}
+unsafe impl Sync for XsStream<'_> {}
 
 #[cfg(feature = "async_watch")]
 impl Stream for XsStream<'_> {
