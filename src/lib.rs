@@ -38,6 +38,8 @@ pub struct Xs {
     libxenstore: LibXenStore,
 }
 
+unsafe impl Send for Xs {}
+
 #[derive(Debug)]
 pub struct XsWatchEntry {
     pub path: String,
