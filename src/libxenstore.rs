@@ -1,4 +1,4 @@
-use std::os::raw::{c_char, c_uint, c_ulong, c_void};
+use std::os::raw::{c_char, c_int, c_uint, c_ulong, c_void};
 
 use xenstore_sys::{xs_handle, xs_transaction_t};
 
@@ -39,6 +39,17 @@ type FnWrite = fn(
     data: *const c_void,
     len: c_uint,
 ) -> bool;
+// xs_watch
+type FnWatch =
+    fn(h: *mut xs_handle, path: *const c_char, token: *const c_char) -> bool;
+// xs_fileno
+type FnFileno = fn(h: *mut xs_handle) -> c_int;
+// xs_check_watch
+type FnCheckWatch = fn(h: *mut xs_handle) -> *const *const c_char;
+// xs_read_watch
+type FnReadWatch = fn(h: *mut xs_handle, num: *mut c_uint) -> *const *const c_char;
+// xs_unwatch
+type FnUnwatch = fn(h: *mut xs_handle, path: *const c_char, token: *const c_char) -> bool;
 
 #[derive(Debug)]
 pub struct LibXenStore {
@@ -49,6 +60,12 @@ pub struct LibXenStore {
     pub read: RawSymbol<FnRead>,
     pub rm: RawSymbol<FnRm>,
     pub write: RawSymbol<FnWrite>,
+
+    pub watch: RawSymbol<FnWatch>,
+    pub fileno: RawSymbol<FnFileno>,
+    pub check_watch: RawSymbol<FnCheckWatch>,
+    pub read_watch: RawSymbol<FnReadWatch>,
+    pub unwatch: RawSymbol<FnUnwatch>,
 }
 
 impl LibXenStore {
@@ -75,6 +92,21 @@ impl LibXenStore {
         let write_sym: Symbol<FnWrite> = lib.get(b"xs_write\0")?;
         let write = write_sym.into_raw();
 
+        let watch_sym: Symbol<FnWatch> = lib.get(b"xs_watch\0")?;
+        let watch = watch_sym.into_raw();
+
+        let fileno_sym: Symbol<FnFileno> = lib.get(b"xs_fileno\0")?;
+        let fileno = fileno_sym.into_raw();
+
+        let check_watch_sym: Symbol<FnCheckWatch> = lib.get(b"xs_check_watch\0")?;
+        let check_watch = check_watch_sym.into_raw();
+
+        let read_watch_sym: Symbol<FnReadWatch> = lib.get(b"xs_read_watch\0")?;
+        let read_watch = read_watch_sym.into_raw();
+
+        let unwatch_sym: Symbol<FnUnwatch> = lib.get(b"xs_unwatch\0")?;
+        let unwatch = unwatch_sym.into_raw();
+
         Ok(LibXenStore {
             lib,
             open,
@@ -83,6 +115,11 @@ impl LibXenStore {
             read,
             rm,
             write,
+            watch,
+            fileno,
+            check_watch,
+            read_watch,
+            unwatch,
         })
     }
 }
