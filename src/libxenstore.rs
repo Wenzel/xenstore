@@ -28,7 +28,7 @@ type FnRead = fn(
 
 #[derive(Debug)]
 pub struct LibXenStore {
-    lib: Library,
+    _lib: Library,
     pub open: RawSymbol<FnOpen>,
     pub close: RawSymbol<FnClose>,
     pub directory: RawSymbol<FnDirectory>,
@@ -54,7 +54,7 @@ impl LibXenStore {
         let read = read_sym.into_raw();
 
         Ok(LibXenStore {
-            lib,
+            _lib: lib,
             open,
             close,
             directory,
