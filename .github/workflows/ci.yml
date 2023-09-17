@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - 'master'
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        subcommand: ['build', 'clippy', 'test']
+        include:
+            - subcommand: 'clippy'
+              # treat warnings as errors
+              args: '-- -D warnings'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install crate dependencies
+        run: sudo apt-get install -y libxen-dev
+
+      - run: cargo ${{ matrix.subcommand }} ${{ matrix.args }}
