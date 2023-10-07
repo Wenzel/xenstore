@@ -87,15 +87,18 @@ impl Xs {
         }
     }
 
-    pub fn write(&self, transaction: XBTransaction, path: &str, data: &str
-    ) -> Result<(), IoError> {
+    pub fn write(&self, transaction: XBTransaction, path: &str, data: &str) -> Result<(), IoError> {
         let char_data = data.as_bytes();
-        let len: c_uint = c_uint::try_from(char_data.len())
-            .expect("Too much data");
+        let len: c_uint = c_uint::try_from(char_data.len()).expect("Too much data");
         let c_path = CString::new(path).unwrap();
         let trans_value = transaction.to_u32().expect("Invalid transaction value");
-        let res = (self.libxenstore.write)(self.handle, trans_value, c_path.as_ptr(),
-                                           char_data.as_ptr() as *const c_void, len);
+        let res = (self.libxenstore.write)(
+            self.handle,
+            trans_value,
+            c_path.as_ptr(),
+            char_data.as_ptr() as *const c_void,
+            len,
+        );
         if res {
             Ok(())
         } else {

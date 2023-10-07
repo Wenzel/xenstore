@@ -11,11 +11,13 @@ jobs:
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        subcommand: ['build', 'clippy', 'test']
+        subcommand: ['fmt', 'build', 'clippy', 'test']
         include:
             - subcommand: 'clippy'
               # treat warnings as errors
               args: '-- -D warnings'
+            - subcommand: 'fmt'
+              args: '--check'
     steps:
       - uses: actions/checkout@v4
 
