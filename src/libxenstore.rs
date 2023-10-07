@@ -1,12 +1,13 @@
 use std::os::raw::{c_char, c_uint, c_ulong, c_void};
 
+use std::ffi::OsString;
 use xenstore_sys::{xs_handle, xs_transaction_t};
 
 use libloading::os::unix::Symbol as RawSymbol;
-use libloading::{library_filename, Error, Library, Symbol};
+use libloading::{Error, Library, Symbol};
 use log::info;
 
-const LIBXENSTORE_BASENAME: &str = "xenstore";
+const LIBXENSTORE_BASENAME: &str = "libxenstore.so.4";
 // xs_open
 type FnOpen = fn(flags: c_ulong) -> *mut xs_handle;
 // xs_close
@@ -49,7 +50,7 @@ pub struct LibXenStore {
 
 impl LibXenStore {
     pub unsafe fn new() -> Result<Self, Error> {
-        let lib_filename = library_filename(LIBXENSTORE_BASENAME);
+        let lib_filename: OsString = LIBXENSTORE_BASENAME.into();
         info!("Loading {}", lib_filename.to_str().unwrap());
         let lib = Library::new(lib_filename)?;
         // load symbols
