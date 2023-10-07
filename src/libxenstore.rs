@@ -26,11 +26,7 @@ type FnRead = fn(
     len: *mut c_uint,
 ) -> *mut c_void;
 // xs_rm
-type FnRm = fn(
-    h: *mut xs_handle,
-    t: xs_transaction_t,
-    path: *const c_char,
-) -> bool;
+type FnRm = fn(h: *mut xs_handle, t: xs_transaction_t, path: *const c_char) -> bool;
 // xs_write
 type FnWrite = fn(
     h: *mut xs_handle,

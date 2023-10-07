@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use xenstore_rs::{Xs, XsOpenFlags, XBTransaction};
+use xenstore_rs::{XBTransaction, Xs, XsOpenFlags};
 
 /// Demo/test tool for xenstore Rust bindings
 #[derive(Parser)]
@@ -37,19 +37,19 @@ enum Command {
 fn main() {
     let cli = Cli::parse();
 
-    let xs = Xs::new(XsOpenFlags::ReadOnly)
-        .expect("xenstore should open");
+    let xs = Xs::new(XsOpenFlags::ReadOnly).expect("xenstore should open");
 
     match cli.command {
-        Command::List{path} => cmd_list(&xs, &path),
-        Command::Read{path} => cmd_read(&xs, &path),
-        Command::Rm{path} => cmd_rm(&xs, &path),
-        Command::Write{path, data} => cmd_write(&xs, &path, &data),
+        Command::List { path } => cmd_list(&xs, &path),
+        Command::Read { path } => cmd_read(&xs, &path),
+        Command::Rm { path } => cmd_rm(&xs, &path),
+        Command::Write { path, data } => cmd_write(&xs, &path, &data),
     }
 }
 
 fn cmd_list(xs: &Xs, path: &String) {
-    let values = xs.directory(XBTransaction::Null, &path)
+    let values = xs
+        .directory(XBTransaction::Null, &path)
         .expect("path should be readable");
     for value in values {
         println!("{}", value);
@@ -57,7 +57,8 @@ fn cmd_list(xs: &Xs, path: &String) {
 }
 
 fn cmd_read(xs: &Xs, path: &String) {
-    let value = xs.read(XBTransaction::Null, &path)
+    let value = xs
+        .read(XBTransaction::Null, &path)
         .expect("path should be readable");
     println!("{}", value);
 }
