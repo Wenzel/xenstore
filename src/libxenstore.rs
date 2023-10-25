@@ -8,7 +8,7 @@ use libloading::{Error, Library, Symbol};
 use log::info;
 
 const LIBXENSTORE_SONAME_LIST: [&str; 2] = ["3.0", "4"];
-const LIBXENSTORE_BASENAME: &str = "libxenstore.so.";
+const LIBXENSTORE_BASENAME: &str = "libxenstore.so";
 // xs_open
 type FnOpen = fn(flags: c_ulong) -> *mut xs_handle;
 // xs_close
