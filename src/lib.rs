@@ -4,20 +4,13 @@ use std::convert::TryFrom;
 use std::error::Error;
 use std::ffi::{c_void, CStr, CString};
 use std::io::Error as IoError;
+use std::num::NonZeroU32;
 use std::os::raw::{c_char, c_uint};
 use std::slice;
 
-#[macro_use]
-extern crate enum_primitive_derive;
-use num_traits::ToPrimitive;
-
 use libxenstore::LibXenStore;
 
-#[repr(u32)]
-#[derive(Primitive)]
-pub enum XBTransaction {
-    Null = xenstore_sys::XBT_NULL,
-}
+pub struct XBTransaction(NonZeroU32);
 
 #[repr(u32)]
 pub enum XsOpenFlags {
@@ -47,12 +40,12 @@ impl Xs {
 
     pub fn directory(
         &self,
-        transaction: XBTransaction,
+        transaction: Option<XBTransaction>,
         path: &str,
     ) -> Result<Vec<String>, IoError> {
         let mut num = 0;
         let c_path = CString::new(path).unwrap();
-        let trans_value = transaction.to_u32().expect("Invalid transaction value");
+        let trans_value = self.get_trans_value(transaction);
         let res = (self.libxenstore.directory)(self.handle, trans_value, c_path.as_ptr(), &mut num);
         if res.is_null() {
             Err(IoError::last_os_error())
@@ -69,10 +62,10 @@ impl Xs {
         }
     }
 
-    pub fn read(&self, transaction: XBTransaction, path: &str) -> Result<String, IoError> {
+    pub fn read(&self, transaction: Option<XBTransaction>, path: &str) -> Result<String, IoError> {
         let mut len = 0;
         let c_path = CString::new(path).unwrap();
-        let trans_value = transaction.to_u32().expect("Invalid transaction value");
+        let trans_value = self.get_trans_value(transaction);
         let res = (self.libxenstore.read)(self.handle, trans_value, c_path.as_ptr(), &mut len);
         if res.is_null() {
             Err(IoError::last_os_error())
@@ -87,11 +80,16 @@ impl Xs {
         }
     }
 
-    pub fn write(&self, transaction: XBTransaction, path: &str, data: &str) -> Result<(), IoError> {
+    pub fn write(
+        &self,
+        transaction: Option<XBTransaction>,
+        path: &str,
+        data: &str,
+    ) -> Result<(), IoError> {
         let char_data = data.as_bytes();
         let len: c_uint = c_uint::try_from(char_data.len()).expect("Too much data");
         let c_path = CString::new(path).unwrap();
-        let trans_value = transaction.to_u32().expect("Invalid transaction value");
+        let trans_value = self.get_trans_value(transaction);
         let res = (self.libxenstore.write)(
             self.handle,
             trans_value,
@@ -106,15 +104,22 @@ impl Xs {
         }
     }
 
-    pub fn rm(&self, transaction: XBTransaction, path: &str) -> Result<(), IoError> {
+    pub fn rm(&self, transaction: Option<XBTransaction>, path: &str) -> Result<(), IoError> {
         let c_path = CString::new(path).unwrap();
-        let trans_value = transaction.to_u32().expect("Invalid transaction value");
+        let trans_value = self.get_trans_value(transaction);
         let res = (self.libxenstore.rm)(self.handle, trans_value, c_path.as_ptr());
         if res {
             Ok(())
         } else {
             Err(IoError::last_os_error())
         }
+    }
+
+    /// Helper to get the transaction value from Option<XBTransaction>
+    /// either returns xenstore_sys::XBT_NULL if None
+    /// or the non-zero u32 value otherwise
+    fn get_trans_value(&self, trans: Option<XBTransaction>) -> u32 {
+        trans.map(|v| v.0.get()).unwrap_or(xenstore_sys::XBT_NULL)
     }
 
     fn close(&mut self) {
