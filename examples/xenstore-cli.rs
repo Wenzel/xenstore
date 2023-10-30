@@ -1,5 +1,5 @@
 use clap::{Parser, Subcommand};
-use xenstore_rs::{XBTransaction, Xs, XsOpenFlags};
+use xenstore_rs::{Xs, XsOpenFlags};
 
 /// Demo/test tool for xenstore Rust bindings
 #[derive(Parser)]
@@ -48,27 +48,22 @@ fn main() {
 }
 
 fn cmd_list(xs: &Xs, path: &String) {
-    let values = xs
-        .directory(XBTransaction::Null, &path)
-        .expect("path should be readable");
+    let values = xs.directory(None, &path).expect("path should be readable");
     for value in values {
         println!("{}", value);
     }
 }
 
 fn cmd_read(xs: &Xs, path: &String) {
-    let value = xs
-        .read(XBTransaction::Null, &path)
-        .expect("path should be readable");
+    let value = xs.read(None, &path).expect("path should be readable");
     println!("{}", value);
 }
 
 fn cmd_rm(xs: &Xs, path: &String) {
-    xs.rm(XBTransaction::Null, &path)
-        .expect("cannot rm xenstore path");
+    xs.rm(None, &path).expect("cannot rm xenstore path");
 }
 
 fn cmd_write(xs: &Xs, path: &String, data: &String) {
-    xs.write(XBTransaction::Null, &path, &data)
+    xs.write(None, &path, &data)
         .expect("cannot write to xenstore path");
 }
