@@ -5,15 +5,19 @@ use std::error::Error;
 use std::ffi::{c_void, CStr, CString};
 use std::io::{self, Error as IoError};
 use std::num::NonZeroU32;
-use std::os::fd::RawFd;
 use std::os::raw::{c_char, c_uint};
-use std::pin::Pin;
 use std::slice;
-use std::task::{Context, Poll};
 
+#[cfg(feature = "async_watch")]
 use futures::Stream;
-use tokio::io::unix::AsyncFd;
-use tokio::io::Interest;
+#[cfg(feature = "async_watch")]
+use std::{
+    os::fd::RawFd,
+    pin::Pin,
+    task::{Context, Poll},
+};
+#[cfg(feature = "async_watch")]
+use tokio::io::{unix::AsyncFd, Interest};
 
 use libxenstore::LibXenStore;
 
@@ -50,7 +54,9 @@ pub struct XsStream<'a> {
     current_fd: Option<i32>,
 }
 
+#[cfg(feature = "async_watch")]
 unsafe impl Send for XsStream<'_> {}
+#[cfg(feature = "async_watch")]
 unsafe impl Sync for XsStream<'_> {}
 
 #[cfg(feature = "async_watch")]
