@@ -89,11 +89,7 @@ fn cmd_watch(xs: &Xs, path: &String) {
 
     while let Ok(events) = xs.read_watch() {
         for event in events {
-            println!(
-                "{}: {:?}",
-                event.path,
-                xs.read(XBTransaction::Null, &event.path)
-            );
+            println!("{}: {:?}", event.path, xs.read(None, &event.path));
         }
     }
 
@@ -114,11 +110,7 @@ fn cmd_watch_async(xs: &Xs, path: &String) {
         let mut stream = xs.get_stream().unwrap();
 
         while let Some(event) = stream.next().await {
-            println!(
-                "{}: {:?}",
-                event.path,
-                xs.read(XBTransaction::Null, &event.path)
-            );
+            println!("{}: {:?}", event.path, xs.read(None, &event.path));
         }
     });
 }
