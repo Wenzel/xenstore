@@ -1,13 +1,16 @@
+use libloading::Error;
 use std::os::raw::{c_char, c_int, c_uint, c_ulong, c_void};
-
-use std::ffi::OsString;
 use xenstore_sys::{xs_handle, xs_transaction_t};
 
-use libloading::os::unix::Symbol as RawSymbol;
-use libloading::{Error, Library, Symbol};
-use log::info;
+#[cfg(not(feature = "static"))]
+use {
+    libloading::os::unix::Symbol as RawSymbol,
+    libloading::{Library, Symbol},
+};
 
+#[cfg(not(feature = "static"))]
 const LIBXENSTORE_SONAME_LIST: [&str; 2] = ["3.0", "4"];
+#[cfg(not(feature = "static"))]
 const LIBXENSTORE_BASENAME: &str = "libxenstore.so";
 // xs_open
 type FnOpen = fn(flags: c_ulong) -> *mut xs_handle;
@@ -42,12 +45,13 @@ type FnWatch = fn(h: *mut xs_handle, path: *const c_char, token: *const c_char) 
 // xs_fileno
 type FnFileno = fn(h: *mut xs_handle) -> c_int;
 // xs_check_watch
-type FnCheckWatch = fn(h: *mut xs_handle) -> *const *const c_char;
+type FnCheckWatch = fn(h: *mut xs_handle) -> *mut *mut c_char;
 // xs_read_watch
-type FnReadWatch = fn(h: *mut xs_handle, num: *mut c_uint) -> *const *const c_char;
+type FnReadWatch = fn(h: *mut xs_handle, num: *mut c_uint) -> *mut *mut c_char;
 // xs_unwatch
 type FnUnwatch = fn(h: *mut xs_handle, path: *const c_char, token: *const c_char) -> bool;
 
+#[cfg(not(feature = "static"))]
 #[derive(Debug)]
 pub struct LibXenStore {
     _lib: Library,
@@ -65,10 +69,31 @@ pub struct LibXenStore {
     pub unwatch: RawSymbol<FnUnwatch>,
 }
 
+#[cfg(feature = "static")]
+#[derive(Debug)]
+pub struct LibXenStore {
+    pub open: FnOpen,
+    pub close: FnClose,
+    pub directory: FnDirectory,
+    pub read: FnRead,
+    pub rm: FnRm,
+    pub write: FnWrite,
+
+    pub watch: FnWatch,
+    pub fileno: FnFileno,
+    pub check_watch: FnCheckWatch,
+    pub read_watch: FnReadWatch,
+    pub unwatch: FnUnwatch,
+}
+
 impl LibXenStore {
     /// Loads the libxenstore.so library dynamically, by trying multiple SONAMES
     /// On failure it returns the last load error
+    #[cfg(not(feature = "static"))]
     pub unsafe fn new() -> Result<Self, Error> {
+        use log::info;
+        use std::ffi::OsString;
+
         let mut last_load_error: Option<Error> = None;
         for soname in LIBXENSTORE_SONAME_LIST {
             let lib_filename = format!("{}.{}", LIBXENSTORE_BASENAME, soname);
@@ -131,5 +156,88 @@ impl LibXenStore {
             }
         }
         Err(last_load_error.unwrap())
+    }
+
+    #[cfg(feature = "static")]
+    pub unsafe fn new() -> Result<Self, Error> {
+        use xenstore_sys::{
+            xs_check_watch, xs_close, xs_directory, xs_fileno, xs_open, xs_read, xs_read_watch,
+            xs_rm, xs_unwatch, xs_watch, xs_write,
+        };
+
+        // write safe Rust wrappers to unsafe extern "C" functions
+        fn safe_open(flags: c_ulong) -> *mut xs_handle {
+            unsafe { xs_open(flags) }
+        }
+
+        fn safe_close(xsh: *mut xs_handle) {
+            unsafe { xs_close(xsh) }
+        }
+
+        fn safe_directory(
+            h: *mut xs_handle,
+            t: xs_transaction_t,
+            path: *const c_char,
+            num: *mut c_uint,
+        ) -> *mut *mut c_char {
+            unsafe { xs_directory(h, t, path, num) }
+        }
+
+        fn safe_read(
+            h: *mut xs_handle,
+            t: xs_transaction_t,
+            path: *const c_char,
+            len: *mut c_uint,
+        ) -> *mut c_void {
+            unsafe { xs_read(h, t, path, len) }
+        }
+
+        fn safe_rm(h: *mut xs_handle, t: xs_transaction_t, path: *const c_char) -> bool {
+            unsafe { xs_rm(h, t, path) }
+        }
+
+        fn safe_write(
+            h: *mut xs_handle,
+            t: xs_transaction_t,
+            path: *const c_char,
+            data: *const c_void,
+            len: c_uint,
+        ) -> bool {
+            unsafe { xs_write(h, t, path, data, len) }
+        }
+
+        fn safe_watch(h: *mut xs_handle, path: *const c_char, token: *const c_char) -> bool {
+            unsafe { xs_watch(h, path, token) }
+        }
+
+        fn safe_fileno(h: *mut xs_handle) -> c_int {
+            unsafe { xs_fileno(h) }
+        }
+
+        fn safe_check_watch(h: *mut xs_handle) -> *mut *mut c_char {
+            unsafe { xs_check_watch(h) }
+        }
+
+        fn safe_read_watch(h: *mut xs_handle, num: *mut c_uint) -> *mut *mut c_char {
+            unsafe { xs_read_watch(h, num) }
+        }
+
+        fn safe_unwatch(h: *mut xs_handle, path: *const c_char, token: *const c_char) -> bool {
+            unsafe { xs_unwatch(h, path, token) }
+        }
+
+        Ok(LibXenStore {
+            open: safe_open,
+            close: safe_close,
+            directory: safe_directory,
+            read: safe_read,
+            rm: safe_rm,
+            write: safe_write,
+            watch: safe_watch,
+            fileno: safe_fileno,
+            check_watch: safe_check_watch,
+            read_watch: safe_read_watch,
+            unwatch: safe_unwatch,
+        })
     }
 }
