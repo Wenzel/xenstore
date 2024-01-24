@@ -33,5 +33,3 @@ async_watch = ["futures", "tokio"]
 # static linking libxenstore
 static = ["xenstore-sys/static"]
 
-[patch.crates-io]
-xenstore-sys = { git = "https://github.com/Wenzel/xenstore-sys.git", branch = "static_linking_pkg_config" }
