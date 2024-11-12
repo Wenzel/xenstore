@@ -27,6 +27,29 @@ version = "0.3"
 default-features = false
 optional = true
 
+# Tokio implementation dependencies
+[dependencies.log] # Logging
+version = "0.4"
+optional = true
+
+[dependencies.anyhow] # Error handling
+version = "1.0"
+optional = true
+
+[dependencies.tokio]
+version = "1.0"
+features = ["sync", "net", "io-util", "rt", "fs", "macros"]
+optional = true
+
+[dependencies.uuid] # Used for xenstore token generation/management
+version = "1.11"
+features = ["v4"]
+optional = true
+
+[dependencies.libc] # needed to O_NONBLOCK
+version = "*"
+optional = true
+
 [dev-dependencies]
 clap = { version = "4.1.4", features = ["derive"] }
 
@@ -34,3 +57,4 @@ clap = { version = "4.1.4", features = ["derive"] }
 default = ["unix"]
 unix = []
 async = ["futures", "trait-variant"]
+async-tokio = ["log", "async", "tokio", "anyhow", "uuid", "libc"]

@@ -10,7 +10,7 @@ pub(crate) mod wire;
 #[cfg(feature = "unix")]
 pub mod unix;
 
-#[cfg(feature = "tokio")]
+#[cfg(feature = "async-tokio")]
 pub mod tokio;
 
 use std::io;
