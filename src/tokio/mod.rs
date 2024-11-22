@@ -35,7 +35,7 @@ use crate::{
 ///
 /// It can be cloned and used concurrently by multiple tasks.
 #[derive(Clone, Debug)]
-pub struct XsTokio(mpsc::Sender<XsTokioMessage>);
+pub struct XsTokio(mpsc::UnboundedSender<XsTokioMessage>);
 
 impl XsTokio {
     /// Try to open Xenstore interface.
@@ -63,7 +63,6 @@ impl XsTokio {
                 request,
                 response_sender,
             }))
-            .await
             .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))?;
 
         let response = response_receiver
@@ -133,7 +132,7 @@ impl AsyncXs for XsTokio {
 /// Tokio watch object.
 pub struct XsTokioWatch {
     event_receiver: mpsc::Receiver<Box<str>>,
-    tokio_channel: mpsc::Sender<XsTokioMessage>,
+    tokio_channel: mpsc::UnboundedSender<XsTokioMessage>,
     token: XsWatchToken,
 }
 
@@ -150,13 +149,13 @@ impl Drop for XsTokioWatch {
         // Try to unsubscribe upstream (to not leak the watch token/state).
         // If it fails, it means that the upper backend has died.
         self.tokio_channel
-            .blocking_send(XsTokioMessage::WatchUnsubscribe(self.token))
+            .send(XsTokioMessage::WatchUnsubscribe(self.token))
             .ok();
     }
 }
 
 impl AsyncWatch for XsTokio {
-    async fn watch(&mut self, path: &str) -> io::Result<impl Stream<Item = Box<str>> + 'static> {
+    async fn watch(&self, path: &str) -> io::Result<impl Stream<Item = Box<str>> + 'static> {
         let (event_sender, event_receiver) = mpsc::channel(8);
         let (result_channel, result_receiver) = oneshot::channel();
 
@@ -166,7 +165,6 @@ impl AsyncWatch for XsTokio {
                 event_sender,
                 result_channel,
             })
-            .await
             .map_err(|e| io::Error::new(ErrorKind::BrokenPipe, e))?;
 
         let token = result_receiver

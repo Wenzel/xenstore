@@ -54,7 +54,7 @@ struct XsTokioState {
 
     request_channel: mpsc::Sender<XsMessage>,
     response_channel: mpsc::Receiver<XsMessage>,
-    message_receiver: mpsc::Receiver<XsTokioMessage>,
+    message_receiver: mpsc::UnboundedReceiver<XsTokioMessage>,
 }
 
 fn find_suitable_token<V>(watch_subscribers: &HashMap<Uuid, V>) -> XsWatchToken {
@@ -270,7 +270,7 @@ impl XsTokioState {
     }
 }
 
-pub fn launch_xenstore_task<S>(xs_stream: S) -> mpsc::Sender<XsTokioMessage>
+pub fn launch_xenstore_task<S>(xs_stream: S) -> mpsc::UnboundedSender<XsTokioMessage>
 where
     S: AsyncRead + AsyncWrite + Send + 'static,
 {
@@ -303,7 +303,7 @@ where
         }
     });
 
-    let (sender, receiver) = mpsc::channel(4);
+    let (sender, receiver) = mpsc::unbounded_channel();
 
     let mut state = XsTokioState {
         pending_tasks: [const { Cell::new(None) }; MAX_REQUEST_COUNT],
