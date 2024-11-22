@@ -4,7 +4,7 @@
 
 mod interface;
 
-use std::io;
+use std::{cell::RefCell, io, ops::DerefMut};
 
 use crate::{
     wire::{XsMessage, XsMessageType},
@@ -12,7 +12,7 @@ use crate::{
 };
 
 /// Unix Xenstore implementation.
-pub struct XsUnix(interface::XsUnixInterface);
+pub struct XsUnix(RefCell<interface::XsUnixInterface>);
 
 impl XsUnix {
     /// Try to open Xenstore interface.
@@ -20,13 +20,14 @@ impl XsUnix {
     ///  - `/run/xenstored/socket` (unix domain socket)
     ///  - [crate::wire::XENBUS_DEVICE_PATH] (xenstore device)
     pub fn new() -> io::Result<Self> {
-        Ok(Self(interface::XsUnixInterface::new()?))
+        Ok(Self(RefCell::new(interface::XsUnixInterface::new()?)))
     }
 
-    fn transmit_request(&mut self, request: XsMessage) -> io::Result<XsMessage> {
-        request.write_to(&mut self.0)?;
+    fn transmit_request(&self, request: XsMessage) -> io::Result<XsMessage> {
+        let mut writer = self.0.borrow_mut();
+        request.write_to(writer.deref_mut())?;
 
-        let response = XsMessage::read_from(&mut self.0)?;
+        let response = XsMessage::read_from(writer.deref_mut())?;
 
         match response.msg_type {
             // Response type must match request.
@@ -41,7 +42,7 @@ impl XsUnix {
 }
 
 impl Xs for XsUnix {
-    fn directory(&mut self, path: &str) -> io::Result<Vec<Box<str>>> {
+    fn directory(&self, path: &str) -> io::Result<Vec<Box<str>>> {
         // TODO: If we receive E2BIG, it means that the directory listing is too long,
         //       and that we should use DIRECTORY_PART.
         let response =
@@ -56,7 +57,7 @@ impl Xs for XsUnix {
             .collect())
     }
 
-    fn read(&mut self, path: &str) -> io::Result<Box<str>> {
+    fn read(&self, path: &str) -> io::Result<Box<str>> {
         let response =
             self.transmit_request(XsMessage::from_string(XsMessageType::Read, 0, path))?;
 
@@ -69,7 +70,7 @@ impl Xs for XsUnix {
             .into_boxed_str())
     }
 
-    fn write(&mut self, path: &str, data: &str) -> io::Result<()> {
+    fn write(&self, path: &str, data: &str) -> io::Result<()> {
         self.transmit_request(XsMessage::from_string_slice(
             XsMessageType::Write,
             0,
@@ -79,7 +80,7 @@ impl Xs for XsUnix {
         Ok(())
     }
 
-    fn rm(&mut self, path: &str) -> io::Result<()> {
+    fn rm(&self, path: &str) -> io::Result<()> {
         self.transmit_request(XsMessage::from_string(XsMessageType::Rm, 0, path))?;
 
         Ok(())

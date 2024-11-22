@@ -82,7 +82,7 @@ impl XsTokio {
 }
 
 impl AsyncXs for XsTokio {
-    async fn directory(&mut self, path: &str) -> io::Result<Vec<Box<str>>> {
+    async fn directory(&self, path: &str) -> io::Result<Vec<Box<str>>> {
         let response = self
             .transmit_request(XsMessage::from_string(XsMessageType::Directory, 0, path))
             .await?;
@@ -96,7 +96,7 @@ impl AsyncXs for XsTokio {
             .collect())
     }
 
-    async fn read(&mut self, path: &str) -> io::Result<Box<str>> {
+    async fn read(&self, path: &str) -> io::Result<Box<str>> {
         let response = self
             .transmit_request(XsMessage::from_string(XsMessageType::Read, 0, path))
             .await?;
@@ -110,7 +110,7 @@ impl AsyncXs for XsTokio {
             .into_boxed_str())
     }
 
-    async fn write(&mut self, path: &str, data: &str) -> io::Result<()> {
+    async fn write(&self, path: &str, data: &str) -> io::Result<()> {
         self.transmit_request(XsMessage::from_string_slice(
             XsMessageType::Write,
             0,
@@ -121,7 +121,7 @@ impl AsyncXs for XsTokio {
         Ok(())
     }
 
-    async fn rm(&mut self, path: &str) -> io::Result<()> {
+    async fn rm(&self, path: &str) -> io::Result<()> {
         self.transmit_request(XsMessage::from_string(XsMessageType::Rm, 0, path))
             .await?;
 

@@ -19,16 +19,16 @@ use std::io;
 /// All xenstore implementations must implement this trait.
 pub trait Xs {
     /// Try to list the files of a directory.
-    fn directory(&mut self, path: &str) -> io::Result<Vec<Box<str>>>;
+    fn directory(&self, path: &str) -> io::Result<Vec<Box<str>>>;
 
     /// Read a node.
-    fn read(&mut self, path: &str) -> io::Result<Box<str>>;
+    fn read(&self, path: &str) -> io::Result<Box<str>>;
 
     /// Write a node.
-    fn write(&mut self, path: &str, data: &str) -> io::Result<()>;
+    fn write(&self, path: &str, data: &str) -> io::Result<()>;
 
     /// Remove a node.
-    fn rm(&mut self, path: &str) -> io::Result<()>;
+    fn rm(&self, path: &str) -> io::Result<()>;
 }
 
 /// Xenstore transaction capability trait.
@@ -46,7 +46,7 @@ pub trait Xs {
 pub trait XsTransaction: Xs {
     type Span: Xs; // + 'static ?
 
-    fn transaction(&mut self) -> io::Result<Self::Span>;
+    fn transaction(&self) -> io::Result<Self::Span>;
 }
 
 /// Refer to [XsTransaction] for more information.
@@ -60,16 +60,16 @@ pub trait XsTransactionSpan: Xs {
 #[trait_variant::make(AsyncXs: Send)]
 pub trait LocalAsyncXs {
     /// Try to list the files of a directory.
-    async fn directory(&mut self, path: &str) -> io::Result<Vec<Box<str>>>;
+    async fn directory(&self, path: &str) -> io::Result<Vec<Box<str>>>;
 
     /// Read a node.
-    async fn read(&mut self, path: &str) -> io::Result<Box<str>>;
+    async fn read(&self, path: &str) -> io::Result<Box<str>>;
 
     /// Write a node.
-    async fn write(&mut self, path: &str, data: &str) -> io::Result<()>;
+    async fn write(&self, path: &str, data: &str) -> io::Result<()>;
 
     /// Remove a node.
-    async fn rm(&mut self, path: &str) -> io::Result<()>;
+    async fn rm(&self, path: &str) -> io::Result<()>;
 }
 
 /// [`XsTransaction`] async variant.
@@ -78,7 +78,7 @@ pub trait LocalAsyncXs {
 pub trait LocalAsyncXsTransaction: AsyncXs {
     type Span: Xs;
 
-    async fn transaction(&mut self) -> io::Result<Self::Span>;
+    async fn transaction(&self) -> io::Result<Self::Span>;
 }
 
 /// [`XsTransactionSpan`] async variant.
@@ -95,7 +95,7 @@ pub trait LocalAsyncXsTransactionSpan: Xs {
 pub trait LocalAsyncWatch {
     /// Create a [`futures::Stream`] yielding paths of updated nodes/subnodes.
     async fn watch(
-        &mut self,
+        &self,
         path: &str,
     ) -> io::Result<impl futures::Stream<Item = Box<str>> + Unpin + 'static>;
 }
