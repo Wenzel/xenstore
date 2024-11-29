@@ -105,6 +105,7 @@ impl XsTokioState {
                         XsMessageType::Watch,
                         req_id as u32,
                         &[&path, &token.0.to_string()],
+                        true,
                     ))
                     .await?;
 
@@ -128,6 +129,7 @@ impl XsTokioState {
                         XsMessageType::Unwatch,
                         req_id as u32,
                         &[path, &token.0.to_string()],
+                        true,
                     ))
                     .await?;
 

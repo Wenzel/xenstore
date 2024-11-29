@@ -115,6 +115,7 @@ impl AsyncXs for XsTokio {
             XsMessageType::Write,
             0,
             &[path, data],
+            false,
         ))
         .await?;
 

@@ -75,6 +75,7 @@ impl Xs for XsUnix {
             XsMessageType::Write,
             0,
             &[path, data],
+            false,
         ))?;
 
         Ok(())

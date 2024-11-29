@@ -158,12 +158,18 @@ impl XsMessage {
         msg_type: XsMessageType,
         request_id: u32,
         strings: &[&'_ str],
+        trailing_nul: bool,
     ) -> Self {
         let mut payload: Vec<u8> = Vec::new();
 
         for s in strings {
             payload.write_all(s.as_bytes()).unwrap(); // infailble
             payload.push(0);
+        }
+
+        // Remove trailing NUL character (e.g WRITE)
+        if !trailing_nul {
+            payload.remove(payload.len() - 1);
         }
 
         Self {
