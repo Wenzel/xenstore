@@ -7,9 +7,11 @@
 
 pub(crate) mod wire;
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(feature = "unix")]
 pub mod unix;
 
+#[cfg(not(target_os = "windows"))]
 #[cfg(feature = "async-tokio")]
 pub mod tokio;
 
