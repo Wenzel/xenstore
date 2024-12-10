@@ -23,7 +23,7 @@ version = "0.1.2"
 optional = true
 
 [dependencies.futures]
-version = "0.3"
+version = "0.3.31"
 default-features = false
 optional = true
 
