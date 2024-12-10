@@ -47,7 +47,7 @@ features = ["v4"]
 optional = true
 
 [dependencies.libc] # needed to O_NONBLOCK
-version = "*"
+version = "0.2.168"
 optional = true
 
 [dev-dependencies]
