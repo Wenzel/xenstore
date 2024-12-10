@@ -15,16 +15,17 @@ jobs:
         include:
             - subcommand: 'clippy'
               # treat warnings as errors
-              args: '-- -D warnings'
+              args: '--all-features -- -D warnings'
             - subcommand: 'fmt'
               args: '--check'
+            - subcommand: 'build'
+              args: '--all-features'
+            - subcommand: 'test'
+              args: '--all-features'
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-
-      - name: Install crate dependencies
-        run: sudo apt-get install -y libxen-dev
 
       - run: cargo ${{ matrix.subcommand }} ${{ matrix.args }}
