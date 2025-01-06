@@ -28,7 +28,7 @@ use interface::{launch_xenstore_task, XsTokioMessage, XsTokioRequest, XsWatchTok
 
 use crate::{
     wire::{XsMessage, XsMessageType},
-    AsyncWatch, AsyncXs,
+    AsyncWatch, AsyncWatchDepth, AsyncXs,
 };
 
 /// Tokio Xenstore implementation.
@@ -157,12 +157,23 @@ impl Drop for XsTokioWatch {
 
 impl AsyncWatch for XsTokio {
     async fn watch(&self, path: &str) -> io::Result<impl Stream<Item = Box<str>> + 'static> {
+        self.watch_depth(path, None).await
+    }
+}
+
+impl AsyncWatchDepth for XsTokio {
+    async fn watch_depth(
+        &self,
+        path: &str,
+        depth: Option<u32>,
+    ) -> io::Result<impl Stream<Item = Box<str>> + 'static> {
         let (event_sender, event_receiver) = mpsc::channel(8);
         let (result_channel, result_receiver) = oneshot::channel();
 
         self.0
             .send(XsTokioMessage::WatchSubscribe {
                 path: path.to_string().into_boxed_str(),
+                depth,
                 event_sender,
                 result_channel,
             })

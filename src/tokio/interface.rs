@@ -25,6 +25,7 @@ pub enum XsTokioMessage {
     Request(XsTokioRequest),
     WatchSubscribe {
         path: Box<str>,
+        depth: Option<u32>,
         event_sender: mpsc::Sender<Box<str>>,
         result_channel: oneshot::Sender<io::Result<XsWatchToken>>,
     },
@@ -94,17 +95,25 @@ impl XsTokioState {
             }
             XsTokioMessage::WatchSubscribe {
                 path,
+                depth,
                 event_sender: channel,
                 result_channel,
             } => {
                 let token = find_suitable_token(&self.watch_subscribers);
+
+                // WATCH has a additional optional third parameter for specifying depth.
+                let strings: &[&str] = if let Some(depth) = depth {
+                    &[&path, &token.0.to_string(), &depth.to_string()]
+                } else {
+                    &[&path, &token.0.to_string()]
+                };
 
                 // Make the actual WATCH command
                 self.request_channel
                     .send(XsMessage::from_string_slice(
                         XsMessageType::Watch,
                         req_id as u32,
-                        &[&path, &token.0.to_string()],
+                        strings,
                         true,
                     ))
                     .await?;

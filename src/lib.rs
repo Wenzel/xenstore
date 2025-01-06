@@ -101,3 +101,15 @@ pub trait LocalAsyncWatch {
         path: &str,
     ) -> io::Result<impl futures::Stream<Item = Box<str>> + Unpin + 'static>;
 }
+
+/// Xenstore watch with depth capability.
+#[cfg(feature = "async")]
+#[trait_variant::make(AsyncWatchDepth: Send)]
+pub trait LocalAsyncWatchDepth {
+    /// Create a [`futures::Stream`] yielding paths of updated nodes/subnodes.
+    async fn watch_depth(
+        &self,
+        path: &str,
+        depth: Option<u32>,
+    ) -> io::Result<impl futures::Stream<Item = Box<str>> + Unpin + 'static>;
+}
