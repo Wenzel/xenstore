@@ -15,6 +15,13 @@ pub mod unix;
 #[cfg(feature = "async-tokio")]
 pub mod tokio;
 
+#[cfg(not(target_os = "windows"))]
+#[cfg(feature = "async-smol")]
+pub mod smol;
+
+#[cfg(feature = "async-generic")]
+pub mod xs_async;
+
 use std::io;
 
 #[derive(Clone, Copy, Debug)]
