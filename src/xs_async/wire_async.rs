@@ -1,10 +1,8 @@
 //! Some wire utilities for async.
-use std::{
-    convert::TryInto,
-    io::{ErrorKind, Read, Write},
-};
+use core::convert::TryInto;
+use std::io::{self, ErrorKind, IoSlice, Read, Write};
 
-use tokio::io::{self, AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use futures::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::wire::{XsMessage, XENSTORE_PAYLOAD_MAX};
 
@@ -80,8 +78,9 @@ impl XsMessage {
         // len
         write_u32(&mut header_writer, self.payload.len() as u32)?;
 
-        writer.write_all(&header).await?;
-        writer.write_all(&self.payload).await?;
+        writer
+            .write_all_vectored(&mut [IoSlice::new(&header), IoSlice::new(&self.payload)])
+            .await?;
 
         Ok(())
     }

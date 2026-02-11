@@ -1,11 +1,11 @@
 use std::{cell::Cell, collections::HashMap};
 
-use anyhow::{anyhow, bail};
-use log::{debug, error, info, warn};
-use tokio::{
-    io::{self, AsyncRead, AsyncWrite, Error, ErrorKind},
-    sync::{mpsc, oneshot},
+use futures::{
+    channel::oneshot,
+    io::{self, Error, ErrorKind},
 };
+use log::{debug, info, warn};
+use thiserror::Error;
 use uuid::Uuid;
 
 use crate::wire::{XsMessage, XsMessageType};
@@ -13,25 +13,55 @@ use crate::wire::{XsMessage, XsMessageType};
 /// Maximum number of pending requests.
 const MAX_REQUEST_COUNT: usize = 32;
 
+#[derive(Error, Debug)]
+pub enum XsAsyncError {
+    #[error("no available slot")]
+    NoSlot,
+    #[error("unwatch without watch")]
+    UnwatchNoWatch,
+    #[error("channel error")]
+    BrokenChannel(#[source] flume::SendError<XsMessage>),
+    #[error("unwatch failed")]
+    UnwatchFailure,
+    #[error("received invalid response")]
+    InvalidResponse { expected: XsMessageType },
+    #[error("received invalid request id")]
+    InvalidRequestId,
+    #[error("no related request to this req_id")]
+    UnknownRequestId,
+    #[error("got non-uuid token")]
+    NonUuidToken(#[source] uuid::Error),
+    #[error("got non-utf8 payload")]
+    NonUtf8Payload(#[source] std::str::Utf8Error),
+    #[error("got invalid payload")]
+    InvalidPayload,
+}
+
+impl From<flume::SendError<XsMessage>> for XsAsyncError {
+    fn from(value: flume::SendError<XsMessage>) -> Self {
+        Self::BrokenChannel(value)
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct XsWatchToken(Uuid);
 
-pub struct XsTokioRequest {
+pub struct XsAsyncRequest {
     pub request: XsMessage,
     pub response_sender: oneshot::Sender<XsMessage>,
 }
 
-pub enum XsTokioMessage {
-    Request(XsTokioRequest),
+pub enum XsAsyncMessage {
+    Request(XsAsyncRequest),
     WatchSubscribe {
         path: Box<str>,
-        event_sender: mpsc::Sender<Box<str>>,
+        event_sender: flume::Sender<Box<str>>,
         result_channel: oneshot::Sender<io::Result<XsWatchToken>>,
     },
     WatchUnsubscribe(XsWatchToken),
 }
 
-enum XsTokioTask {
+enum XsAsyncTask {
     Request(oneshot::Sender<XsMessage>),
     WatchSubscribe {
         subscriber_info: WatchSubscriberInfo,
@@ -42,19 +72,16 @@ enum XsTokioTask {
 }
 
 struct WatchSubscriberInfo {
-    channel: mpsc::Sender<Box<str>>,
+    channel: flume::Sender<Box<str>>,
     // We need to store the watch patch as it is required by UNWATCH.
     path: Box<str>,
 }
 
-struct XsTokioState {
-    pending_tasks: [Cell<Option<XsTokioTask>>; MAX_REQUEST_COUNT],
+#[derive(Default)]
+pub struct XsAsyncState {
+    pending_tasks: [Cell<Option<XsAsyncTask>>; MAX_REQUEST_COUNT],
     watch_subscribers: HashMap<Uuid, WatchSubscriberInfo>,
     task_count: usize,
-
-    request_channel: mpsc::Sender<XsMessage>,
-    response_channel: mpsc::Receiver<XsMessage>,
-    message_receiver: mpsc::UnboundedReceiver<XsTokioMessage>,
 }
 
 fn find_suitable_token<V>(watch_subscribers: &HashMap<Uuid, V>) -> XsWatchToken {
@@ -68,8 +95,12 @@ fn find_suitable_token<V>(watch_subscribers: &HashMap<Uuid, V>) -> XsWatchToken 
     }
 }
 
-impl XsTokioState {
-    async fn process_message(&mut self, message: XsTokioMessage) -> anyhow::Result<()> {
+impl XsAsyncState {
+    async fn process_message(
+        &mut self,
+        message: XsAsyncMessage,
+        xs_sender: &flume::Sender<XsMessage>,
+    ) -> Result<(), XsAsyncError> {
         // Find a available task slot.
         let Some((req_id, slot)) = self
             .pending_tasks
@@ -78,21 +109,21 @@ impl XsTokioState {
             .enumerate()
             .find(|(_, slot)| slot.is_none())
         else {
-            bail!("No available slot");
+            return Err(XsAsyncError::NoSlot);
         };
 
         match message {
-            XsTokioMessage::Request(XsTokioRequest {
+            XsAsyncMessage::Request(XsAsyncRequest {
                 mut request,
                 response_sender,
             }) => {
                 request.request_id = req_id as u32;
 
-                self.request_channel.send(request).await?;
-                *slot = Some(XsTokioTask::Request(response_sender));
+                xs_sender.send_async(request).await?;
+                *slot = Some(XsAsyncTask::Request(response_sender));
                 self.task_count += 1;
             }
-            XsTokioMessage::WatchSubscribe {
+            XsAsyncMessage::WatchSubscribe {
                 path,
                 event_sender: channel,
                 result_channel,
@@ -100,8 +131,8 @@ impl XsTokioState {
                 let token = find_suitable_token(&self.watch_subscribers);
 
                 // Make the actual WATCH command
-                self.request_channel
-                    .send(XsMessage::from_string_slice(
+                xs_sender
+                    .send_async(XsMessage::from_string_slice(
                         XsMessageType::Watch,
                         req_id as u32,
                         &[&path, &token.0.to_string()],
@@ -109,23 +140,23 @@ impl XsTokioState {
                     ))
                     .await?;
 
-                // Wait until we got confirmation of the WATCH command by upstream.
-                *slot = Some(XsTokioTask::WatchSubscribe {
+                // Wait until we get confirmation of the WATCH command by upstream.
+                *slot = Some(XsAsyncTask::WatchSubscribe {
                     subscriber_info: WatchSubscriberInfo { channel, path },
                     result_channel,
                     token,
                 });
                 self.task_count += 1;
             }
-            XsTokioMessage::WatchUnsubscribe(token) => {
+            XsAsyncMessage::WatchUnsubscribe(token) => {
                 let Some(WatchSubscriberInfo { path, .. }) = self.watch_subscribers.get(&token.0)
                 else {
-                    bail!("Attempting unwatch without watch.");
+                    return Err(XsAsyncError::UnwatchNoWatch);
                 };
 
                 // Make the actual UNWATCH command
-                self.request_channel
-                    .send(XsMessage::from_string_slice(
+                xs_sender
+                    .send_async(XsMessage::from_string_slice(
                         XsMessageType::Unwatch,
                         req_id as u32,
                         &[path, &token.0.to_string()],
@@ -134,7 +165,7 @@ impl XsTokioState {
                     .await?;
 
                 // Wait until we got confirmation of the WATCH command by upstream.
-                *slot = Some(XsTokioTask::WatchUnsubscribe(token));
+                *slot = Some(XsAsyncTask::WatchUnsubscribe(token));
                 self.task_count += 1;
             }
         }
@@ -142,7 +173,7 @@ impl XsTokioState {
         Ok(())
     }
 
-    async fn process_response(&mut self, response: XsMessage) -> anyhow::Result<()> {
+    async fn process_response(&mut self, response: XsMessage) -> Result<(), XsAsyncError> {
         if response.msg_type == XsMessageType::WatchEvent {
             // Process a watch event (it's always req_id = 0) and is unsolicitated.
             return self.process_watch_entry(response).await;
@@ -153,21 +184,21 @@ impl XsTokioState {
 
         // Take a reference the the task slot (if any).
         let Some(slot) = self.pending_tasks.get_mut(response.request_id as usize) else {
-            bail!("Invalid req_id received")
+            return Err(XsAsyncError::InvalidRequestId);
         };
 
         // Take it (leaving None at the place).
         let Some(task) = slot.take() else {
-            bail!("No related request to this req_id")
+            return Err(XsAsyncError::UnknownRequestId);
         };
         self.task_count -= 1;
 
         match task {
-            XsTokioTask::Request(sender) => {
+            XsAsyncTask::Request(sender) => {
                 // Usual request, forward response to caller (even if it is Error variant).
                 sender.send(response).ok();
             }
-            XsTokioTask::WatchSubscribe {
+            XsAsyncTask::WatchSubscribe {
                 token,
                 result_channel,
                 subscriber_info,
@@ -196,11 +227,13 @@ impl XsTokioState {
                                 format!("Got unexpected response ({response:?})"),
                             )))
                             .ok();
-                        bail!("Got invalid response to WATCH command")
+                        return Err(XsAsyncError::InvalidResponse {
+                            expected: XsMessageType::Watch,
+                        });
                     }
                 }
             }
-            XsTokioTask::WatchUnsubscribe(token) => {
+            XsAsyncTask::WatchUnsubscribe(token) => {
                 match response.msg_type {
                     XsMessageType::Unwatch => {
                         // Make unwatch effective
@@ -208,8 +241,12 @@ impl XsTokioState {
                             warn!("Unwatched nothing");
                         }
                     }
-                    XsMessageType::Error => bail!("Unwatch failure"),
-                    _ => bail!("Got invalid response to WATCH command"),
+                    XsMessageType::Error => return Err(XsAsyncError::UnwatchFailure),
+                    _ => {
+                        return Err(XsAsyncError::InvalidResponse {
+                            expected: XsMessageType::Watch,
+                        })
+                    }
                 }
             }
         }
@@ -217,33 +254,63 @@ impl XsTokioState {
         Ok(())
     }
 
-    async fn process_watch_entry(&mut self, msg: XsMessage) -> Result<(), anyhow::Error> {
-        let [value, token] = msg.parse_payload_list()?[..] else {
-            bail!("Invalid watch event payload received")
+    async fn process_watch_entry(&mut self, message: XsMessage) -> Result<(), XsAsyncError> {
+        let [value, token] = message
+            .parse_payload_list()
+            .map_err(XsAsyncError::NonUtf8Payload)?[..]
+        else {
+            return Err(XsAsyncError::InvalidPayload);
         };
 
-        let uuid = Uuid::try_parse(token).map_err(|_| anyhow!("Got non-UUID token"))?;
+        let uuid = Uuid::try_parse(token).map_err(XsAsyncError::NonUuidToken)?;
 
-        if let Some(subscriber) = self.watch_subscribers.get(&uuid) {
-            if let Err(e) = subscriber.channel.send(value.into()).await {
+        if let Some(subscriber) = self.watch_subscribers.get_mut(&uuid) {
+            if let Err(e) = subscriber.channel.send_async(value.into()).await {
                 warn!("Lost watch subscriber: {e}");
 
                 // Subscriber is dead, remove it.
                 self.watch_subscribers.remove(&uuid);
             }
         } else {
-            warn!("Unregistered watch message ? ({uuid})");
+            // Some kernels may misorder the watch event and watch response, try to
+            // deal with these cases by preemptively sending the event to its related
+            // channel.
+            // We lookup in pending task if any task matches the watch_event, and
+            // send the event to its dedicated channel, so we won't lose the event.
+            if let Some(channel) = self
+                .pending_tasks
+                .iter_mut()
+                .flat_map(Cell::get_mut)
+                .find_map(|task| match task {
+                    XsAsyncTask::WatchSubscribe {
+                        token,
+                        subscriber_info,
+                        ..
+                    } if token.0 == uuid => Some(subscriber_info.channel.clone()),
+                    _ => None,
+                })
+            {
+                debug!("Processing out of order watch response/event ({uuid})");
+                channel.send(value.into()).ok();
+            } else {
+                warn!("Unregistered watch message ? ({uuid})");
+            }
         }
 
         Ok(())
     }
 
-    async fn run(&mut self) {
+    pub async fn run(
+        mut self,
+        message_channel: flume::Receiver<XsAsyncMessage>,
+        xs_receiver: flume::Receiver<XsMessage>,
+        xs_sender: flume::Sender<XsMessage>,
+    ) {
         loop {
             if self.task_count == MAX_REQUEST_COUNT {
                 // We can't process another task, only interface responses.
                 debug!("Too much tasks");
-                let Some(response) = self.response_channel.recv().await else {
+                let Ok(response) = xs_receiver.recv_async().await else {
                     break;
                 };
 
@@ -251,72 +318,25 @@ impl XsTokioState {
                     warn!("Process response failure: {e}")
                 }
             } else {
-                tokio::select! {
-                    Some(response) = self.response_channel.recv() => {
+                futures::select! {
+                    response = xs_receiver.recv_async() => {
+                        let Ok(response) = response else { break };
                         if let Err(e) = self.process_response(response).await {
                             warn!("Process response failure: {e}")
                         }
                     },
-                    Some(message) = self.message_receiver.recv() => {
-                        if let Err(e) = self.process_message(message).await {
+                    message = message_channel.recv_async() => {
+                        let Ok(message) = message else { break };
+                        if let Err(e) = self.process_message(message, &xs_sender).await {
                             warn!("Process message failure: {e}")
                         }
-                    }
+                    },
                     // In case we get a None, something is dead in the loop, stop here.
-                    else => break,
+                    complete => break,
                 }
             }
         }
 
         info!("Communication channel died");
     }
-}
-
-pub fn launch_xenstore_task<S>(xs_stream: S) -> mpsc::UnboundedSender<XsTokioMessage>
-where
-    S: AsyncRead + AsyncWrite + Send + 'static,
-{
-    let (mut rx, mut tx) = io::split(xs_stream);
-    let (response_tx, response_rx) = mpsc::channel(4);
-    let (request_tx, mut request_rx) = mpsc::channel(4);
-
-    // Message receiver task
-    tokio::spawn(async move {
-        while let Ok(message) = XsMessage::read_message_async(&mut rx).await {
-            debug!("< {message:?}");
-
-            if response_tx.send(message).await.is_err() {
-                break;
-            }
-        }
-
-        error!("Read message failure");
-    });
-
-    // Message sender task
-    tokio::spawn(async move {
-        while let Some(message) = request_rx.recv().await {
-            debug!("> {message:?}");
-
-            if let Err(e) = XsMessage::write_message_async(&message, &mut tx).await {
-                error!("Write message failure {e}");
-                break;
-            }
-        }
-    });
-
-    let (sender, receiver) = mpsc::unbounded_channel();
-
-    let mut state = XsTokioState {
-        pending_tasks: [const { Cell::new(None) }; MAX_REQUEST_COUNT],
-        watch_subscribers: HashMap::new(),
-        task_count: 0,
-        request_channel: request_tx,
-        response_channel: response_rx,
-        message_receiver: receiver,
-    };
-
-    tokio::spawn(async move { state.run().await });
-
-    sender
 }
